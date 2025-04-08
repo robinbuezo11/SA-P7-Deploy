@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-users-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Mi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-users-secret
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: cm9vdA==
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-users
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-users
+  template:
+    metadata:
+      labels:
+        app: db-users
+    spec:
+      containers:
+      - name: db-users
+        image: mysql:latest
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "50m"
+          limits:
+            memory: "512Mi"
+            cpu: "100m"
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-users-secret
+              key: MYSQL_ROOT_PASSWORD
+        volumeMounts:
+        - name: db-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: db-users-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-users
+spec:
+  selector:
+    app: db-users
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: LoadBalancer

@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-products-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Mi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-products-secret
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: cm9vdA==
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-products
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-products
+  template:
+    metadata:
+      labels:
+        app: db-products
+    spec:
+      containers:
+      - name: db-products
+        image: mysql:latest
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "50m"
+          limits:
+            memory: "512Mi"
+            cpu: "100m"
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-products-secret
+              key: MYSQL_ROOT_PASSWORD
+        volumeMounts:
+        - name: db-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: db-products-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-products
+spec:
+  selector:
+    app: db-products
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: LoadBalancer

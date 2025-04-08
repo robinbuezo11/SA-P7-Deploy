@@ -1,0 +1,74 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: db-promotions-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 250Mi
+
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: db-promotions-secret
+type: Opaque
+data:
+  MYSQL_ROOT_PASSWORD: cm9vdA==
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: db-promotions
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: db-promotions
+  template:
+    metadata:
+      labels:
+        app: db-promotions
+    spec:
+      containers:
+      - name: db-promotions
+        image: mysql:latest
+        ports:
+        - containerPort: 3306
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "50m"
+          limits:
+            memory: "512Mi"
+            cpu: "100m"
+        env:
+        - name: MYSQL_ROOT_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: db-promotions-secret
+              key: MYSQL_ROOT_PASSWORD
+        volumeMounts:
+        - name: db-storage
+          mountPath: /var/lib/mysql
+      volumes:
+      - name: db-storage
+        persistentVolumeClaim:
+          claimName: db-promotions-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: db-promotions
+spec:
+  selector:
+    app: db-promotions
+  ports:
+    - protocol: TCP
+      port: 3306
+      targetPort: 3306
+  type: LoadBalancer
